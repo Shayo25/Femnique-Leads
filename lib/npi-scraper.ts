@@ -34,6 +34,9 @@ interface NPPESResponse {
   results: NPPESResult[];
 }
 
+const MAX_PAGES_PER_TAXONOMY = 50;
+const CONSECUTIVE_EMPTY_PAGES_THRESHOLD = 3;
+
 async function fetchNPPESPage(
   taxonomyDescription: string,
   state: string,
@@ -69,39 +72,60 @@ async function fetchAllForTaxonomy(
 
   const results: NPPESResult[] = [];
   let skip = 0;
-  let hasMore = true;
+  let pageCount = 0;
+  let consecutiveEmptyPages = 0;
 
-  while (hasMore) {
+  while (pageCount < MAX_PAGES_PER_TAXONOMY) {
     try {
       const response = await fetchNPPESPage(taxonomyDescription, state, skip);
 
       if (!response.results || response.results.length === 0) {
-        hasMore = false;
         break;
       }
 
+      let foundOnPage = 0;
       for (const result of response.results) {
         const enumDate = result.basic?.enumeration_date;
         if (enumDate) {
           const parsedDate = new Date(enumDate);
           if (parsedDate >= cutoffDate) {
             results.push(result);
+            foundOnPage++;
           }
         }
       }
 
-      if (response.results.length < 200) {
-        hasMore = false;
+      if (foundOnPage === 0) {
+        consecutiveEmptyPages++;
+        if (consecutiveEmptyPages >= CONSECUTIVE_EMPTY_PAGES_THRESHOLD) {
+          console.log(
+            `[Scraper] Stopping ${taxonomyDescription} after ${consecutiveEmptyPages} consecutive pages with no recent results (page ${pageCount + 1})`
+          );
+          break;
+        }
       } else {
-        skip += 200;
-        await sleep(NPI_API_DELAY_MS);
+        consecutiveEmptyPages = 0;
       }
+
+      if (response.results.length < 200) {
+        break;
+      }
+
+      skip += 200;
+      pageCount++;
+      await sleep(NPI_API_DELAY_MS);
     } catch (error) {
-      console.error(`Error fetching taxonomy "${taxonomyDescription}" at skip ${skip}:`, error);
-      hasMore = false;
+      console.error(
+        `[Scraper] Error fetching "${taxonomyDescription}" at skip ${skip}:`,
+        error
+      );
+      break;
     }
   }
 
+  console.log(
+    `[Scraper] ${taxonomyDescription}: found ${results.length} results within ${lookbackDays} days (scanned ${pageCount + 1} pages)`
+  );
   return results;
 }
 
@@ -110,15 +134,22 @@ function parseNPPESResult(result: NPPESResult) {
     (a) => a.address_purpose === "LOCATION"
   ) || result.addresses?.[0];
 
-  const primaryTaxonomy = result.taxonomies?.find((t) => t.primary) || result.taxonomies?.[0];
+  const primaryTaxonomy =
+    result.taxonomies?.find((t) => t.primary) || result.taxonomies?.[0];
 
   return {
     npiNumber: result.number,
-    organizationName: result.basic?.organization_name || "Unknown Organization",
-    authorizedFirstName: result.basic?.authorized_official_first_name || null,
-    authorizedLastName: result.basic?.authorized_official_last_name || null,
-    authorizedTitle: result.basic?.authorized_official_title_or_position || null,
-    authorizedPhone: formatPhone(result.basic?.authorized_official_telephone_number),
+    organizationName:
+      result.basic?.organization_name || "Unknown Organization",
+    authorizedFirstName:
+      result.basic?.authorized_official_first_name || null,
+    authorizedLastName:
+      result.basic?.authorized_official_last_name || null,
+    authorizedTitle:
+      result.basic?.authorized_official_title_or_position || null,
+    authorizedPhone: formatPhone(
+      result.basic?.authorized_official_telephone_number
+    ),
     phone: formatPhone(locationAddress?.telephone_number),
     fax: formatPhone(locationAddress?.fax_number),
     addressLine1: locationAddress?.address_1 || null,
@@ -137,9 +168,12 @@ function parseNPPESResult(result: NPPESResult) {
 
 export async function runNPIScrape(lookbackDays?: number, state?: string) {
   const settings = await prisma.setting.findMany();
-  const settingsMap = Object.fromEntries(settings.map((s) => [s.key, s.value]));
+  const settingsMap = Object.fromEntries(
+    settings.map((s) => [s.key, s.value])
+  );
 
-  const effectiveLookback = lookbackDays ?? parseInt(settingsMap["lookbackDays"] || "30", 10);
+  const effectiveLookback =
+    lookbackDays ?? parseInt(settingsMap["lookbackDays"] || "30", 10);
   const effectiveState = state ?? settingsMap["targetState"] ?? "TX";
 
   const scrapeRun = await prisma.scrapeRun.create({
@@ -159,6 +193,9 @@ export async function runNPIScrape(lookbackDays?: number, state?: string) {
 
   try {
     for (const taxonomy of TAXONOMY_CODES) {
+      console.log(
+        `[Scraper] Processing taxonomy: ${taxonomy.description} (${taxonomy.code})`
+      );
       try {
         const results = await fetchAllForTaxonomy(
           taxonomy.description,
@@ -194,7 +231,10 @@ export async function runNPIScrape(lookbackDays?: number, state?: string) {
 
         await sleep(NPI_API_DELAY_MS);
       } catch (error) {
-        console.error(`Error processing taxonomy ${taxonomy.code}:`, error);
+        console.error(
+          `[Scraper] Error processing taxonomy ${taxonomy.code}:`,
+          error
+        );
       }
     }
 
@@ -224,6 +264,10 @@ export async function runNPIScrape(lookbackDays?: number, state?: string) {
       },
     });
 
+    console.log(
+      `[Scraper] Completed in ${Math.round(durationSeconds)}s. Found: ${totalFound}, New: ${newLeads}, Dupes: ${duplicates}`
+    );
+
     return {
       id: scrapeRun.id,
       status: "completed",
@@ -234,7 +278,8 @@ export async function runNPIScrape(lookbackDays?: number, state?: string) {
     };
   } catch (error) {
     const durationSeconds = (Date.now() - startTime) / 1000;
-    const errorMessage = error instanceof Error ? error.message : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
 
     await prisma.scrapeRun.update({
       where: { id: scrapeRun.id },
