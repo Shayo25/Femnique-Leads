@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/db";
+import { updateScheduler } from "@/lib/scheduler";
 
 export async function GET() {
   const settings = await prisma.setting.findMany();
@@ -32,6 +33,14 @@ export async function PUT(request: Request) {
         update: { value: String(body[key]) },
         create: { key, value: String(body[key]) },
       });
+    }
+  }
+
+  if ("autoSchedule" in body || "autoScheduleTime" in body) {
+    try {
+      await updateScheduler();
+    } catch (e) {
+      console.error("Failed to update scheduler:", e);
     }
   }
 
