@@ -1,0 +1,75 @@
+@import "tw-animate-css";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --cream: #FAF7F2;
+    --warm-gold: #C4A265;
+    --charcoal: #2C2C2C;
+    --taupe: #A89F91;
+    --soft-white: #FFFFFF;
+    --success: #4A7C59;
+    --warning: #D4A017;
+    --muted-brand: #B0A899;
+    --error: #8B3A3A;
+
+    --background: 40 33% 97%;
+    --foreground: 0 0% 17%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 17%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 17%;
+    --primary: 37 39% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 33 10% 95%;
+    --secondary-foreground: 0 0% 17%;
+    --muted: 33 10% 95%;
+    --muted-foreground: 30 8% 62%;
+    --accent: 37 39% 58%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 41% 39%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 30 12% 82%;
+    --input: 30 12% 82%;
+    --ring: 37 39% 58%;
+    --radius: 0.75rem;
+
+    --chart-1: 145 27% 39%;
+    --chart-2: 37 39% 58%;
+    --chart-3: 43 78% 46%;
+    --chart-4: 30 8% 67%;
+    --chart-5: 0 0% 17%;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[var(--cream)] text-[var(--charcoal)] antialiased;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  .font-heading {
+    font-family: 'Playfair Display', 'EB Garamond', Georgia, serif;
+  }
+
+  .font-body {
+    font-family: 'Inter', 'DM Sans', system-ui, sans-serif;
+  }
+
+  .font-mono-brand {
+    font-family: 'JetBrains Mono', 'IBM Plex Mono', monospace;
+  }
+}

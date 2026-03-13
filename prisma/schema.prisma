@@ -1,0 +1,66 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model Lead {
+  id                    Int       @id @default(autoincrement())
+  npiNumber             String    @unique
+  organizationName      String
+  authorizedFirstName   String?
+  authorizedLastName    String?
+  authorizedTitle       String?
+  authorizedPhone       String?
+  phone                 String?
+  fax                   String?
+  addressLine1          String?
+  addressLine2          String?
+  city                  String?
+  state                 String    @default("TX")
+  zip                   String?
+  taxonomyCode          String
+  taxonomyDescription   String
+  enumerationDate       String
+  daysSinceRegistration Int?
+  websiteStatus         String    @default("UNCHECKED")
+  websiteUrl            String?
+  websiteDetails        String?
+  leadScore             String    @default("Unscored")
+  ghlPushed             Boolean   @default(false)
+  ghlPushedAt           DateTime?
+  notes                 String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+  scrapeBatch           String?
+
+  @@index([leadScore])
+  @@index([websiteStatus])
+  @@index([enumerationDate])
+  @@index([taxonomyCode])
+}
+
+model ScrapeRun {
+  id              Int      @id @default(autoincrement())
+  runDate         DateTime @default(now())
+  status          String   @default("running")
+  totalFound      Int      @default(0)
+  newLeads        Int      @default(0)
+  duplicates      Int      @default(0)
+  hotLeads        Int      @default(0)
+  warmLeads       Int      @default(0)
+  coldLeads       Int      @default(0)
+  lookbackDays    Int      @default(30)
+  durationSeconds Float?
+  errorMessage    String?
+  createdAt       DateTime @default(now())
+}
+
+model Setting {
+  id    Int    @id @default(autoincrement())
+  key   String @unique
+  value String
+}
